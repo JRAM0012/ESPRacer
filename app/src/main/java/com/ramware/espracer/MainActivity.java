@@ -1,3 +1,4 @@
+// original
 package com.ramware.espracer;
 
 import android.annotation.SuppressLint;
@@ -14,6 +15,9 @@ import android.os.Build;
 import android.os.Bundle;
 import android.widget.Button;
 import android.widget.Toast;
+import android.widget.ListView;
+import android.widget.TextView;
+import android.widget.ArrayAdapter;
 
 import androidx.annotation.RequiresApi;
 import androidx.appcompat.app.AppCompatActivity;
@@ -25,13 +29,22 @@ import java.util.List;
 
 public class MainActivity extends AppCompatActivity {
 
+    private ListView deviceListView;
+    private TextView noDevicesTextView;
+    private BluetoothDevice selectedDevice;
+    private ArrayAdapter<String> deviceListAdapter;
+    private List<BluetoothDevice> discoveredDevices = new ArrayList<>();
+    private BluetoothScanner bluetoothScanner;
+
     @SuppressLint("SetTextI18n")
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        Button scanOrExitButton = findViewById(R.id.scan_button);
+        Button actionButton = findViewById(R.id.scan_button);
+        deviceListView = findViewById(R.id.device_list);
+        noDevicesTextView = findViewById(R.id.no_devices_text);
 
         BluetoothManager bluetoothManager = (BluetoothManager) getSystemService(Context.BLUETOOTH_SERVICE);
         BluetoothAdapter bluetoothAdapter = bluetoothManager != null ? bluetoothManager.getAdapter() : null;
@@ -39,44 +52,74 @@ public class MainActivity extends AppCompatActivity {
         if (bluetoothAdapter == null || !bluetoothAdapter.isEnabled()) {
             // bluetooth disabled
             Toast.makeText(this, "Bluetooth is disabled", Toast.LENGTH_SHORT).show();
-            scanOrExitButton.setText("Exit");
-            scanOrExitButton.setOnClickListener(v -> {
+            actionButton.setText("Exit");
+            actionButton.setOnClickListener(v -> {
                 finish();
                 System.exit(0);
             });
         } else {
             // bluetooth enabled
             Toast.makeText(this, "Bluetooth is enabled", Toast.LENGTH_SHORT).show();
-            scanOrExitButton.setText("Scan");
-            scanOrExitButton.setOnClickListener(v -> {
-                if (checkPermissions()) {
-                    BluetoothScanner scanner = new BluetoothScanner(this, new OnScanResultListener() {
-                        @Override
-                        public void onScanStarted() {
-                            Toast.makeText(MainActivity.this, "Scan started", Toast.LENGTH_SHORT).show();
-                        }
+            actionButton.setText("Scan");
+            if (checkPermissions()) {
+                deviceListAdapter = new ArrayAdapter<>(this, android.R.layout.simple_list_item_1, new ArrayList<>());
+                deviceListView.setAdapter(deviceListAdapter);
 
-                        @Override
-                        public void onDeviceFound(BluetoothDevice device) {
-                            Toast.makeText(MainActivity.this, "Device found: " + device.getName(), Toast.LENGTH_SHORT).show();
-                        }
+                bluetoothScanner = new BluetoothScanner(this, new OnScanResultListener() {
+                    @Override
+                    public void onScanStarted() {
+                        Toast.makeText(MainActivity.this, "Scan started", Toast.LENGTH_SHORT).show();
+                        actionButton.setVisibility(Button.GONE);
+                        discoveredDevices.clear();
+                        deviceListAdapter.clear();
+                        noDevicesTextView.setVisibility(TextView.GONE);
+                        deviceListView.setVisibility(ListView.VISIBLE);
+                    }
 
-                        @Override
-                        public void onScanFinished(List<BluetoothDevice> devices) {
-                            Toast.makeText(MainActivity.this, "Scan finished. Found " + devices.size() + " devices.", Toast.LENGTH_SHORT).show();
-                        }
+                    @Override
+                    public void onDeviceFound(BluetoothDevice device) {
+//                        Toast.makeText(MainActivity.this, "Device found: " + device.getName(), Toast.LENGTH_SHORT).show();
+                        discoveredDevices.add(device);
+                        deviceListAdapter.add(device.getName() + " (" + device.getAddress() + ")");
+                    }
 
-                        @Override
-                        public void onScanFailed(String message) {
-                            Toast.makeText(MainActivity.this, "Scan failed: " + message, Toast.LENGTH_SHORT).show();
+                    @Override
+                    public void onScanFinished(List<BluetoothDevice> devices) {
+//                        Toast.makeText(MainActivity.this, "Scan finished. Found " + devices.size() + " devices.", Toast.LENGTH_SHORT).show();
+                        if (devices.isEmpty()) {
+                            deviceListView.setVisibility(ListView.GONE);
+                            noDevicesTextView.setVisibility(TextView.VISIBLE);
                         }
-                    });
-                    scanner.startScan();
-                }
-            });
+                        actionButton.setVisibility(Button.VISIBLE);
+                    }
+
+                    @Override
+                    public void onScanFailed(String message) {
+                        Toast.makeText(MainActivity.this, "Scan failed: " + message, Toast.LENGTH_SHORT).show();
+                    }
+                });
+
+                deviceListView.setOnItemClickListener((parent, view, position, id) -> {
+                    selectedDevice = discoveredDevices.get(position);
+                    Toast.makeText(this, "Selected: " + selectedDevice.getName(), Toast.LENGTH_SHORT).show();
+                    actionButton.setText("Connect");
+                });
+
+                actionButton.setOnClickListener(var -> {
+                    if ("Scan".contentEquals(actionButton.getText())) {
+                        if (checkPermissions()) {
+                            bluetoothScanner.startScan();
+                        }
+                    } else if ("Connect".contentEquals(actionButton.getText())) {
+//                            connectToDevice();
+                        Toast.makeText(this, "connectToDevice", Toast.LENGTH_SHORT).show();
+                    }
+                });
+            }
         }
     }
 
+    @RequiresApi(api = Build.VERSION_CODES.S)
     private boolean checkPermissions() {
         if (ContextCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED ||
                 ContextCompat.checkSelfPermission(this, android.Manifest.permission.BLUETOOTH_SCAN) != PackageManager.PERMISSION_GRANTED ||
@@ -149,6 +192,10 @@ public class MainActivity extends AppCompatActivity {
             filter.addAction(BluetoothAdapter.ACTION_DISCOVERY_FINISHED);
             activity.registerReceiver(discoveryReceiver, filter);
 
+            if (ActivityCompat.checkSelfPermission(getApplicationContext(), android.Manifest.permission.BLUETOOTH_SCAN) != PackageManager.PERMISSION_GRANTED) {
+                Toast.makeText(getApplicationContext(), "Permissions are not granted at StartDiscovery", Toast.LENGTH_SHORT).show();
+                return;
+            }
             if (!bluetoothAdapter.startDiscovery()) {
                 scanResultListener.onScanFailed("Failed to start discovery");
             } else {
@@ -157,6 +204,10 @@ public class MainActivity extends AppCompatActivity {
         }
 
         public void stopScan() {
+            if (ActivityCompat.checkSelfPermission(getApplicationContext(), android.Manifest.permission.BLUETOOTH_SCAN) != PackageManager.PERMISSION_GRANTED) {
+                Toast.makeText(getApplicationContext(), "Permissions are not granted at stopScan", Toast.LENGTH_SHORT).show();
+                return;
+            }
             if (bluetoothAdapter != null && bluetoothAdapter.isDiscovering()) {
                 bluetoothAdapter.cancelDiscovery();
             }
@@ -176,11 +227,8 @@ public class MainActivity extends AppCompatActivity {
 
     public interface OnScanResultListener {
         void onScanStarted();
-
         void onDeviceFound(BluetoothDevice device);
-
         void onScanFinished(List<BluetoothDevice> devices);
-
         void onScanFailed(String message);
     }
 }
