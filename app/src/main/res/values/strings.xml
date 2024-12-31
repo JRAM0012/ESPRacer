@@ -1,3 +1,5 @@
 <resources>
     <string name="app_name">ESPRacer</string>
+    <string name="appName">ESPRacer</string>
+    <string name="todo">app splash screen background</string>
 </resources>
