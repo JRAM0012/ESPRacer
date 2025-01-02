@@ -13,19 +13,22 @@ import android.content.IntentFilter;
 import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.Bundle;
+import android.util.Log;
+import android.widget.ArrayAdapter;
 import android.widget.Button;
-import android.widget.Toast;
 import android.widget.ListView;
 import android.widget.TextView;
-import android.widget.ArrayAdapter;
+import android.widget.Toast;
 
 import androidx.annotation.RequiresApi;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
+import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -33,7 +36,7 @@ public class MainActivity extends AppCompatActivity {
     private TextView noDevicesTextView;
     private BluetoothDevice selectedDevice;
     private ArrayAdapter<String> deviceListAdapter;
-    private List<BluetoothDevice> discoveredDevices = new ArrayList<>();
+    private final List<BluetoothDevice> discoveredDevices = new ArrayList<>();
     private BluetoothScanner bluetoothScanner;
 
     @SuppressLint("SetTextI18n")
@@ -48,74 +51,97 @@ public class MainActivity extends AppCompatActivity {
 
         BluetoothManager bluetoothManager = (BluetoothManager) getSystemService(Context.BLUETOOTH_SERVICE);
         BluetoothAdapter bluetoothAdapter = bluetoothManager != null ? bluetoothManager.getAdapter() : null;
-
+        SwipeRefreshLayout swipeRefreshLayout = findViewById(R.id.swipe_refresh);
+        swipeRefreshLayout.setEnabled(false);
         if (bluetoothAdapter == null || !bluetoothAdapter.isEnabled()) {
             // bluetooth disabled
             Toast.makeText(this, "Bluetooth is disabled", Toast.LENGTH_SHORT).show();
+            noDevicesTextView.setText("Cannot connect to ESPRacer with bluetooth disabled");
+            noDevicesTextView.setVisibility(TextView.VISIBLE);
             actionButton.setText("Exit");
             actionButton.setOnClickListener(v -> {
                 finish();
                 System.exit(0);
             });
-        } else {
-            // bluetooth enabled
-            Toast.makeText(this, "Bluetooth is enabled", Toast.LENGTH_SHORT).show();
-            actionButton.setText("Scan");
-            if (checkPermissions()) {
-                deviceListAdapter = new ArrayAdapter<>(this, android.R.layout.simple_list_item_1, new ArrayList<>());
-                deviceListView.setAdapter(deviceListAdapter);
+        }
 
-                bluetoothScanner = new BluetoothScanner(this, new OnScanResultListener() {
-                    @Override
-                    public void onScanStarted() {
-                        Toast.makeText(MainActivity.this, "Scan started", Toast.LENGTH_SHORT).show();
-                        actionButton.setVisibility(Button.GONE);
-                        discoveredDevices.clear();
-                        deviceListAdapter.clear();
-                        noDevicesTextView.setVisibility(TextView.GONE);
-                        deviceListView.setVisibility(ListView.VISIBLE);
-                    }
+        // bluetooth enabled
+        swipeRefreshLayout.setEnabled(true);
+        Toast.makeText(this, "Bluetooth is enabled", Toast.LENGTH_SHORT).show();
+        actionButton.setText("Scan");
+        if (checkPermissions()) {
+            deviceListAdapter = new ArrayAdapter<>(this, android.R.layout.simple_list_item_1, new ArrayList<>());
+            deviceListView.setAdapter(deviceListAdapter);
 
-                    @Override
-                    public void onDeviceFound(BluetoothDevice device) {
-//                        Toast.makeText(MainActivity.this, "Device found: " + device.getName(), Toast.LENGTH_SHORT).show();
-                        discoveredDevices.add(device);
-                        deviceListAdapter.add(device.getName() + " (" + device.getAddress() + ")");
-                    }
-
-                    @Override
-                    public void onScanFinished(List<BluetoothDevice> devices) {
-//                        Toast.makeText(MainActivity.this, "Scan finished. Found " + devices.size() + " devices.", Toast.LENGTH_SHORT).show();
-                        if (devices.isEmpty()) {
-                            deviceListView.setVisibility(ListView.GONE);
-                            noDevicesTextView.setVisibility(TextView.VISIBLE);
+            bluetoothScanner = new BluetoothScanner(this, new OnScanResultListener() {
+                @Override
+                public void onScanStarted() {
+                    Toast.makeText(MainActivity.this, "Scan started", Toast.LENGTH_SHORT).show();
+                    actionButton.setVisibility(Button.GONE);
+                    discoveredDevices.clear();
+                    deviceListAdapter.clear();
+                    noDevicesTextView.setVisibility(TextView.GONE);
+                    deviceListView.setVisibility(ListView.VISIBLE);
+                    Set<BluetoothDevice> pairedDevice = bluetoothAdapter.getBondedDevices();
+                    if (pairedDevice != null && !pairedDevice.isEmpty()) {
+                        for (BluetoothDevice device : pairedDevice) {
+                            discoveredDevices.add(device);
+                            deviceListAdapter.add(device.getName() + " (" + device.getAddress() + ")");
                         }
-                        actionButton.setVisibility(Button.VISIBLE);
                     }
+                    swipeRefreshLayout.setRefreshing(false);
+                }
 
-                    @Override
-                    public void onScanFailed(String message) {
-                        Toast.makeText(MainActivity.this, "Scan failed: " + message, Toast.LENGTH_SHORT).show();
+                @Override
+                public void onDeviceFound(BluetoothDevice device) {
+//                        Toast.makeText(MainActivity.this, "Device found: " + device.getName(), Toast.LENGTH_SHORT).show();
+                    discoveredDevices.add(device);
+                    deviceListAdapter.add(device.getName() + " (" + device.getAddress() + ")");
+                }
+
+                @Override
+                public void onScanFinished(List<BluetoothDevice> devices) {
+//                        Toast.makeText(MainActivity.this, "Scan finished. Found " + devices.size() + " devices.", Toast.LENGTH_SHORT).show();
+                    if (devices.isEmpty()) {
+                        deviceListView.setVisibility(ListView.GONE);
+                        noDevicesTextView.setVisibility(TextView.VISIBLE);
                     }
-                });
+                    actionButton.setVisibility(Button.VISIBLE);
+                    swipeRefreshLayout.setRefreshing(false);
+                }
 
-                deviceListView.setOnItemClickListener((parent, view, position, id) -> {
-                    selectedDevice = discoveredDevices.get(position);
-                    Toast.makeText(this, "Selected: " + selectedDevice.getName(), Toast.LENGTH_SHORT).show();
-                    actionButton.setText("Connect");
-                });
+                @Override
+                public void onScanFailed(String message) {
+                    Toast.makeText(MainActivity.this, "Scan failed: " + message, Toast.LENGTH_SHORT).show();
+                }
+            });
 
-                actionButton.setOnClickListener(var -> {
-                    if ("Scan".contentEquals(actionButton.getText())) {
+            deviceListView.setOnItemClickListener((parent, view, position, id) -> {
+                selectedDevice = discoveredDevices.get(position);
+                Toast.makeText(this, "Selected: " + selectedDevice.getName(), Toast.LENGTH_SHORT).show();
+                actionButton.setText("Connect");
+            });
+
+            swipeRefreshLayout.setOnRefreshListener(() -> {
+                if (checkPermissions()) {
+                    bluetoothScanner.startScan();
+                }
+            });
+
+            actionButton.setOnClickListener(var -> {
+                if ("Scan".contentEquals(actionButton.getText())) {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                         if (checkPermissions()) {
                             bluetoothScanner.startScan();
                         }
-                    } else if ("Connect".contentEquals(actionButton.getText())) {
-//                            connectToDevice();
-                        Toast.makeText(this, "connectToDevice", Toast.LENGTH_SHORT).show();
+                    } else {
+                        Log.d("Error", "onCreate: if scan equals sdk version error");
                     }
-                });
-            }
+                } else if ("Connect".contentEquals(actionButton.getText())) {
+//                            connectToDevice();
+                    Toast.makeText(this, "connectToDevice", Toast.LENGTH_SHORT).show();
+                }
+            });
         }
     }
 
@@ -135,14 +161,23 @@ public class MainActivity extends AppCompatActivity {
         return true;
     }
 
+    public interface OnScanResultListener {
+        void onScanStarted();
+
+        void onDeviceFound(BluetoothDevice device);
+
+        void onScanFinished(List<BluetoothDevice> devices);
+
+        void onScanFailed(String message);
+    }
+
     public class BluetoothScanner {
+        private static final int REQUEST_ENABLE_BT = 1001;
+        private static final int REQUEST_LOCATION_PERMISSION = 1002;
         private final List<BluetoothDevice> discoveredDevices = new ArrayList<>();
         private final OnScanResultListener scanResultListener;
         private final Activity activity;
         private final BluetoothAdapter bluetoothAdapter;
-        private static final int REQUEST_ENABLE_BT = 1001;
-        private static final int REQUEST_LOCATION_PERMISSION = 1002;
-
         private final BroadcastReceiver discoveryReceiver = new BroadcastReceiver() {
             @Override
             public void onReceive(Context context, Intent intent) {
@@ -223,12 +258,5 @@ public class MainActivity extends AppCompatActivity {
                     ContextCompat.checkSelfPermission(activity, android.Manifest.permission.BLUETOOTH_SCAN) == PackageManager.PERMISSION_GRANTED &&
                     ContextCompat.checkSelfPermission(activity, android.Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED;
         }
-    }
-
-    public interface OnScanResultListener {
-        void onScanStarted();
-        void onDeviceFound(BluetoothDevice device);
-        void onScanFinished(List<BluetoothDevice> devices);
-        void onScanFailed(String message);
     }
 }
