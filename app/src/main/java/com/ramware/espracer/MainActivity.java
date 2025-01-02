@@ -1,7 +1,5 @@
-// original
 package com.ramware.espracer;
 
-import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
@@ -11,16 +9,13 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.pm.PackageManager;
-import android.os.Build;
 import android.os.Bundle;
-import android.util.Log;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.ListView;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import androidx.annotation.RequiresApi;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
@@ -39,7 +34,6 @@ public class MainActivity extends AppCompatActivity {
     private final List<BluetoothDevice> discoveredDevices = new ArrayList<>();
     private BluetoothScanner bluetoothScanner;
 
-    @SuppressLint("SetTextI18n")
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -56,9 +50,9 @@ public class MainActivity extends AppCompatActivity {
         if (bluetoothAdapter == null || !bluetoothAdapter.isEnabled()) {
             // bluetooth disabled
             Toast.makeText(this, "Bluetooth is disabled", Toast.LENGTH_SHORT).show();
-            noDevicesTextView.setText("Cannot connect to ESPRacer with bluetooth disabled");
+            noDevicesTextView.setText(R.string.cannot_connect_to_espracer_with_bluetooth_disabled);
             noDevicesTextView.setVisibility(TextView.VISIBLE);
-            actionButton.setText("Exit");
+            actionButton.setText(R.string.exit);
             actionButton.setOnClickListener(v -> {
                 finish();
                 System.exit(0);
@@ -68,10 +62,17 @@ public class MainActivity extends AppCompatActivity {
         // bluetooth enabled
         swipeRefreshLayout.setEnabled(true);
         Toast.makeText(this, "Bluetooth is enabled", Toast.LENGTH_SHORT).show();
-        actionButton.setText("Scan");
+        actionButton.setText(R.string.scan);
         if (checkPermissions()) {
             deviceListAdapter = new ArrayAdapter<>(this, android.R.layout.simple_list_item_1, new ArrayList<>());
             deviceListView.setAdapter(deviceListAdapter);
+            Set<BluetoothDevice> pairedDevice = bluetoothAdapter.getBondedDevices();
+            if (pairedDevice != null && !pairedDevice.isEmpty()) {
+                for (BluetoothDevice device : pairedDevice) {
+                    discoveredDevices.add(device);
+                    deviceListAdapter.add(device.getName() + " (" + device.getAddress() + ")");
+                }
+            }
 
             bluetoothScanner = new BluetoothScanner(this, new OnScanResultListener() {
                 @Override
@@ -119,7 +120,7 @@ public class MainActivity extends AppCompatActivity {
             deviceListView.setOnItemClickListener((parent, view, position, id) -> {
                 selectedDevice = discoveredDevices.get(position);
                 Toast.makeText(this, "Selected: " + selectedDevice.getName(), Toast.LENGTH_SHORT).show();
-                actionButton.setText("Connect");
+                actionButton.setText(R.string.connect);
             });
 
             swipeRefreshLayout.setOnRefreshListener(() -> {
@@ -130,12 +131,8 @@ public class MainActivity extends AppCompatActivity {
 
             actionButton.setOnClickListener(var -> {
                 if ("Scan".contentEquals(actionButton.getText())) {
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                        if (checkPermissions()) {
-                            bluetoothScanner.startScan();
-                        }
-                    } else {
-                        Log.d("Error", "onCreate: if scan equals sdk version error");
+                    if (checkPermissions()) {
+                        bluetoothScanner.startScan();
                     }
                 } else if ("Connect".contentEquals(actionButton.getText())) {
 //                            connectToDevice();
@@ -145,7 +142,6 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    @RequiresApi(api = Build.VERSION_CODES.S)
     private boolean checkPermissions() {
         if (ContextCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED ||
                 ContextCompat.checkSelfPermission(this, android.Manifest.permission.BLUETOOTH_SCAN) != PackageManager.PERMISSION_GRANTED ||
@@ -172,7 +168,6 @@ public class MainActivity extends AppCompatActivity {
     }
 
     public class BluetoothScanner {
-        private static final int REQUEST_ENABLE_BT = 1001;
         private static final int REQUEST_LOCATION_PERMISSION = 1002;
         private final List<BluetoothDevice> discoveredDevices = new ArrayList<>();
         private final OnScanResultListener scanResultListener;
@@ -252,7 +247,6 @@ public class MainActivity extends AppCompatActivity {
             }
         }
 
-        @RequiresApi(api = Build.VERSION_CODES.S)
         private boolean checkPermissions() {
             return ContextCompat.checkSelfPermission(activity, android.Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED &&
                     ContextCompat.checkSelfPermission(activity, android.Manifest.permission.BLUETOOTH_SCAN) == PackageManager.PERMISSION_GRANTED &&
