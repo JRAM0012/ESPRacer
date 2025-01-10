@@ -1,0 +1,10 @@
+<resources>
+    <string name="app_name">ESPRacer</string>
+    <string name="appName">ESPRacer</string>
+    <string name="todo">app splash screen background</string>
+    <string name="no_bluetooth_devices_found">No Bluetooth Devices Found</string>
+    <string name="cannot_connect_to_espracer_with_bluetooth_disabled">Cannot connect to ESPRacer with bluetooth disabled</string>
+    <string name="exit">Exit</string>
+    <string name="scan">Scan</string>
+    <string name="connect">Connect</string>
+</resources>
