@@ -8,6 +8,7 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.pm.ActivityInfo;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
 import android.widget.ArrayAdapter;
@@ -27,11 +28,12 @@ import java.util.Set;
 
 public class MainActivity extends AppCompatActivity {
 
+    private final List<BluetoothDevice> discoveredDevices = new ArrayList<>();
     private ListView deviceListView;
     private TextView noDevicesTextView;
     private BluetoothDevice selectedDevice;
+    private boolean deviceSelectedbool = false;
     private ArrayAdapter<String> deviceListAdapter;
-    private final List<BluetoothDevice> discoveredDevices = new ArrayList<>();
     private BluetoothScanner bluetoothScanner;
 
     @Override
@@ -121,6 +123,7 @@ public class MainActivity extends AppCompatActivity {
                     selectedDevice = discoveredDevices.get(position);
                     Toast.makeText(this, "Selected: " + selectedDevice.getName(), Toast.LENGTH_SHORT).show();
                     actionButton.setText(R.string.connect);
+                    deviceSelectedbool = true;
                 });
 
                 swipeRefreshLayout.setOnRefreshListener(() -> {
@@ -136,6 +139,12 @@ public class MainActivity extends AppCompatActivity {
                         }
                     } else if ("Connect".contentEquals(actionButton.getText())) {
 //                            connectToDevice();
+                        if (deviceSelectedbool) {
+                            Intent intent = new Intent(this, ControlActivity.class);
+                            intent.putExtra("DEVICE_ADDRESS", selectedDevice.getAddress());
+                            startActivity(intent);
+                            setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
+                        }
                         Toast.makeText(this, "connectToDevice", Toast.LENGTH_SHORT).show();
                     }
                 });

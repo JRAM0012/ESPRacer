@@ -7,7 +7,7 @@
         android:id="@+id/splashImage"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:contentDescription="@string/todo"
+        android:contentDescription="@string/esp_racer_background"
         android:scaleType="centerCrop"
         android:src="@drawable/splash_background" />
 
